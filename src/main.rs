@@ -21,6 +21,7 @@ async fn main() {
         .route("/ping", get(|| async { "Pong" }))
         .layer(
             TraceLayer::new_for_http()
+                // setup log level for each event
                 .on_request(DefaultOnRequest::new().level(tracing::Level::INFO))
                 .on_response(DefaultOnResponse::new().level(tracing::Level::INFO))
                 .on_failure(DefaultOnFailure::new().level(tracing::Level::ERROR)),
