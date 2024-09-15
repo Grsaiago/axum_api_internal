@@ -56,8 +56,10 @@ async fn main() {
         .expect("Bind failed");
 
     tracing::info!("Starting server on localhost port 8080");
-    axum::serve(listener, app)
+    if let Err(error) = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("Error starting Server");
+    {
+        tracing::error!("Server shutdown error: {}", error);
+    }
 }
