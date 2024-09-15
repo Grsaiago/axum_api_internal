@@ -1,7 +1,7 @@
 use std::io::IsTerminal;
 
 use axum::{routing::get, Router};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, signal};
 use tower_http::trace::{DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 
 fn setup_logging() {
@@ -11,6 +11,30 @@ fn setup_logging() {
         .with_ansi(std::io::stdout().is_terminal())
         .compact()
         .init();
+}
+
+async fn shutdown_signal() {
+    let cntrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Error installing Cntrl+C hadler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = cntrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 #[tokio::main]
@@ -27,9 +51,13 @@ async fn main() {
                 .on_failure(DefaultOnFailure::new().level(tracing::Level::ERROR)),
         );
 
-    tracing::info!("Server started on localhost port 8080");
     let listener = TcpListener::bind("127.0.0.1:8080")
         .await
         .expect("Bind failed");
-    let _ = axum::serve(listener, app).await;
+
+    tracing::info!("Starting server on localhost port 8080");
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("Error starting Server");
 }
