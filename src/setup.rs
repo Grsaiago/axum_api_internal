@@ -9,6 +9,26 @@ pub fn setup_logging() {
         .init();
 }
 
+pub fn setup_host_port() -> String {
+    let host = std::env::var("SERVER_HOST").unwrap_or_else(|err| {
+        tracing::warn!(
+            "Error loading SERVER_HOST env, fallback to 127.0.0.1: {}",
+            err.to_string()
+        );
+        "127.0.0.1".to_string()
+    });
+
+    let port = std::env::var("SERVER_PORT").unwrap_or_else(|err| {
+        tracing::warn!(
+            "Error loading SERVER_PORT env, fallback to 8080: {}",
+            err.to_string()
+        );
+        "8080".to_string()
+    });
+
+    format!("{}:{}", host, port)
+}
+
 pub async fn setup_graceful_shutdown() {
     let cntrl_c = async {
         tokio::signal::ctrl_c()

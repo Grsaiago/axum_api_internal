@@ -4,13 +4,16 @@ use tokio::{net::TcpListener, signal};
 use tower_http::trace::{DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 
 mod setup;
-use setup::setup_graceful_shutdown;
-use setup::setup_logging;
+use setup::{setup_graceful_shutdown, setup_host_port, setup_logging};
 
 const METRICS_PREFIX: &str = "app";
 
 #[tokio::main]
 async fn main() {
+    if let Err(err) = dotenvy::dotenv() {
+        tracing::warn!("Failed to load .env file: {}", err);
+    }
+
     setup_logging();
 
     // setup prometheus exporting
@@ -32,11 +35,13 @@ async fn main() {
         )
         .layer(prom_layer);
 
-    let listener = TcpListener::bind("127.0.0.1:8080")
-        .await
-        .expect("Bind failed");
+    let host_port = setup_host_port();
+    let listener = TcpListener::bind(&host_port).await.unwrap_or_else(|err| {
+        tracing::error!("Error binding on {}: {}", &host_port, err);
+        panic!("Error binding on {}", &host_port);
+    });
 
-    tracing::info!("Starting server on localhost port 8080");
+    tracing::info!("Starting server on {}", &host_port);
     match axum::serve(listener, app)
         .with_graceful_shutdown(setup_graceful_shutdown())
         .await
