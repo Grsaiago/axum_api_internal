@@ -5,8 +5,36 @@ use tower_http::trace::{DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, T
 
 mod setup;
 use setup::{setup_graceful_shutdown, setup_host_port, setup_logging};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 const METRICS_PREFIX: &str = "app";
+
+#[utoipa::path(
+    get,
+    path = "/healthcheck",
+    responses (
+        (status = OK, body = inline(str), description = "Healthcheck route"),
+    ),
+)]
+// general healthcheck route, returns "ok"
+async fn healthcheck() -> &'static str {
+    "ok"
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(healthcheck),
+    info(
+        contact(
+            name = "Gabriel Saiago",
+            email = "grsaiago@gmail.com",
+            url = "github.com/Grsaiago",
+        ),
+        title = "Axum API!",
+    )
+)]
+struct ApiDoc;
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +52,8 @@ async fn main() {
         .build_pair();
 
     let app = Router::new()
-        .route("/ping", get(|| async { "Pong" }))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .route("/healthcheck", get(healthcheck))
         .route("/metrics", get(|| async move { metric_handle.render() }))
         .layer(
             TraceLayer::new_for_http()
