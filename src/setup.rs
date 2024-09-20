@@ -52,3 +52,33 @@ pub async fn setup_graceful_shutdown() {
         _ = terminate => {},
     }
 }
+
+pub fn setup_connection_string() -> Result<String, std::env::VarError> {
+    let config_vars = [
+        "POSTGRES_DB",
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "DB_HOST",
+    ];
+
+    let unset_vars: Vec<_> = config_vars
+        .iter()
+        .filter(|&var| std::env::var(var).is_err())
+        .copied()
+        .collect();
+
+    if !unset_vars.is_empty() {
+        for var in unset_vars {
+            tracing::info!("unable to load env var {}", &var);
+        }
+        Err(std::env::VarError::NotPresent)
+    } else {
+        let db_name = std::env::var("POSTGRES_DB").unwrap();
+        let db_user = std::env::var("POSTGRES_USER").unwrap();
+        let db_password = std::env::var("POSTGRES_PASSWORD").unwrap();
+        let db_host = std::env::var("DB_HOST").unwrap();
+        Ok(format!(
+            "postgres://{db_user}:{db_password}@{db_host}/{db_name}"
+        ))
+    }
+}
